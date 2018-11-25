@@ -1,4 +1,5 @@
 {
+"type":"AUTOMATIC",
 "rounds":9,
 "players":[
 ]

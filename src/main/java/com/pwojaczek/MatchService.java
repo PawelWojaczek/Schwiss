@@ -18,6 +18,7 @@ public class MatchService {
 
     private int rounds;
     private boolean oddPlayers;
+    private TournamentType tournamentType;
     private List<Player> players = new ArrayList<>();
 
     public void initTournament() {
@@ -37,8 +38,12 @@ public class MatchService {
             } else {
                 matches = createPairs(players);
             }
-
-            createOutcomes(matches);
+            if (tournamentType == TournamentType.AUTOMATIC) {
+                createOutcomes(matches);
+            } else {
+                printOutcomes(pairingNumber, matches);
+                enterOutcomes(matches);
+            }
             printOutcomes(pairingNumber, matches);
             appendPointsForMatches(matches);
         });
@@ -55,6 +60,7 @@ public class MatchService {
         String jsonTxt = IOUtils.toString(is, Charset.forName("UTF-8"));
         JSONObject jsonObject = new JSONObject(new JSONTokener(jsonTxt));
         rounds = jsonObject.getInt("rounds");
+        tournamentType = TournamentType.valueOf(jsonObject.getString("type"));
         JSONArray jsonPlayers = jsonObject.getJSONArray("players");
 
         if (jsonPlayers.length() <= rounds) {
@@ -75,7 +81,6 @@ public class MatchService {
             if (!player.receivedFreePoint()) {
                 player.setFreePoint(true);
                 players.remove(player);
-                player.win();
                 return player;
             }
         }
@@ -291,20 +296,60 @@ public class MatchService {
     }
 
     /**
-     * Method randomly creates outcomes for matches 0-2.
-     * 0 - draw
+     * Method randomly creates outcomes for matches 1-3.
      * 1 - player 1 wins
      * 2 - player 2 wins
+     * 3 - draw
      */
     private void createOutcomes(List<Match> matches) {
         Random random = new Random();
         for (Match match : matches) {
             if (match.getOutcome() != OutcomeEnum.FREE_POINT) {
-                int outcome = random.nextInt(3);
+                int outcome = random.nextInt(3) + 1;
                 setOutcome(match, outcome);
             }
         }
 
+    }
+
+    /**
+     * Method tells user to enter outcomes for matches.
+     * User should enter:
+     * 1 to set player 1 as winning
+     * 2 to set player 2 as winning
+     * 3 to set draw
+     */
+    private void enterOutcomes(List<Match> matches) {
+        List<Match> matchesCopy = new ArrayList<>(matches);
+        for (Match match : matchesCopy) {
+            if (match.getOutcome() != OutcomeEnum.FREE_POINT) {
+                printMatchup(match.getPlayer1(), match.getPlayer2());
+                int outcome = getOutcomeFromUser();
+                setOutcome(match, outcome);
+            }
+        }
+        System.out.println("Save scores? y/n");
+        Scanner scanner = new Scanner(System.in);
+        String response = "";
+        while (!response.equalsIgnoreCase("y") && !response.equalsIgnoreCase("n")) {
+            response = scanner.next();
+        }
+        if (response.equalsIgnoreCase("y")) {
+            IntStream.range(0, matchesCopy.size()).forEach(i -> {
+                matches.get(i).setOutcome(matchesCopy.get(i).getOutcome());
+            });
+        } else {
+            enterOutcomes(matches);
+        }
+    }
+
+    private int getOutcomeFromUser() {
+        Scanner reader = new Scanner(System.in);
+        int outcome = -1;
+        while (outcome != 1 && outcome != 2 && outcome != 3) {
+            outcome = reader.nextInt();
+        }
+        return outcome;
     }
 
     private void appendPointsForMatches(List<Match> matches) {
@@ -314,7 +359,7 @@ public class MatchService {
     }
 
     private void setOutcome(Match match, int number) {
-        if (number == 0) {
+        if (number == 3) {
             match.setOutcome(OutcomeEnum.DRAW);
         } else if (number == 1) {
             match.setOutcome(OutcomeEnum.WIN);
@@ -327,7 +372,9 @@ public class MatchService {
         Player player1 = match.getPlayer1();
         Player player2 = match.getPlayer2();
         OutcomeEnum outcomeEnum = match.getOutcome();
-        if (outcomeEnum == OutcomeEnum.DRAW) {
+        if (outcomeEnum == OutcomeEnum.FREE_POINT) {
+            player1.win();
+        } else if (outcomeEnum == OutcomeEnum.DRAW) {
             player1.draw();
             player2.draw();
         } else if (outcomeEnum == OutcomeEnum.WIN) {
@@ -349,10 +396,22 @@ public class MatchService {
                 Player player1 = match.getPlayer1();
                 Player player2 = match.getPlayer2();
                 OutcomeEnum outcomeEnum = match.getOutcome();
-                System.out.format("%-28s%8s%30s", player1.getName() + "(" + player1.getScore() + ")", outcomeEnum.getOutcome(), player2.getName() + "(" + player2.getScore() + ")\n");
+                if (outcomeEnum != null) {
+                    printMatchup(player1, player2, outcomeEnum.getOutcome());
+                } else {
+                    printMatchup(player1, player2);
+                }
             }
         }
         System.out.println("####################################################################\n");
+    }
+
+    private void printMatchup(Player player1, Player player2) {
+        printMatchup(player1, player2, " - ");
+    }
+
+    private void printMatchup(Player player1, Player player2, String outcome) {
+        System.out.format("%-28s%8s%30s", player1.getName() + "(" + player1.getScore() + ")", outcome, player2.getName() + "(" + player2.getScore() + ")\n");
     }
 
     /**
