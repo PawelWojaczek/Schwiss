@@ -20,6 +20,7 @@ public class MatchService {
     private boolean oddPlayers;
     private TournamentType tournamentType;
     private List<Player> players = new ArrayList<>();
+    private List<PairingHistory> matchHistories = new ArrayList<>();
 
     public void initTournament() {
         try {
@@ -31,23 +32,36 @@ public class MatchService {
         if (players.size() % 2 == 1) {
             oddPlayers = true;
         }
-        IntStream.rangeClosed(1, rounds).forEach(pairingNumber -> {
-            List<Match> matches;
-            if (pairingNumber == 1) {
-                matches = createPairsRandom(players);
-            } else {
-                matches = createPairs(players);
+
+        // Simple test to check if pairings will result in error during creation.
+        // Method will print matches played previously
+        // TODO: Is there an algorithm that checks if the whole tournament can be played?
+        try {
+            IntStream.rangeClosed(1, 1000).forEachOrdered(i -> {
+                IntStream.rangeClosed(1, rounds).forEach(pairingNumber -> {
+                    List<Match> matches;
+                    if (pairingNumber == 1) {
+                        matches = createPairsRandom(players);
+                    } else {
+                        matches = createPairs(players);
+                    }
+                    if (tournamentType == TournamentType.AUTOMATIC) {
+                        createOutcomes(matches);
+                    } else {
+                        printOutcomes(pairingNumber, matches);
+                        enterOutcomes(matches);
+                    }
+                    matchHistories.add(new PairingHistory(pairingNumber, matches));
+//                    printOutcomes(pairingNumber, matches);
+                    appendPointsForMatches(matches);
+                });
+            });
+        } catch (Exception e) {
+            for (PairingHistory pairingHistory : matchHistories) {
+                printOutcomes(pairingHistory.getPairingNumber(), pairingHistory.getMatches());
             }
-            if (tournamentType == TournamentType.AUTOMATIC) {
-                createOutcomes(matches);
-            } else {
-                printOutcomes(pairingNumber, matches);
-                enterOutcomes(matches);
-            }
-            printOutcomes(pairingNumber, matches);
-            appendPointsForMatches(matches);
-        });
-        printResults(players);
+        }
+//        printResults(players);
     }
 
     /**
@@ -173,7 +187,9 @@ public class MatchService {
                 playersToCheck.remove(player2);
                 if (!player1.playedWith(player2) && properSetup != -1 && isPairingPossibleBruteForce(playersToCheck)) {
                     tempPlayers.remove(player2);
-                    return true;
+                    List<Player> tempPlayers2 = new ArrayList<>(tempPlayers);
+                    tempPlayers2.add(player1);
+                    tempPlayers2.add(player2);
                 }
             }
             return false;
